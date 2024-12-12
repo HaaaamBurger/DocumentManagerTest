@@ -121,10 +121,7 @@ public class DocumentManager {
         if (createdFrom != null && created.isBefore(createdFrom)) {
             return false;
         }
-        if (createdTo != null && created.isAfter(createdTo)) {
-            return false;
-        }
-        return true;
+        return createdTo == null || !created.isAfter(createdTo);
     }
 }
 
