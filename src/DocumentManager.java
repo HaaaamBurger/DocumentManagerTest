@@ -2,9 +2,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * For implement this task focus on clear code, and make this solution as simple readable as possible
@@ -17,6 +15,8 @@ import java.util.Optional;
  */
 public class DocumentManager {
 
+    public final Map<String, Document> storage = new HashMap<>();
+
     /**
      * Implementation of this method should upsert the document to your storage
      * And generate unique id if it does not exist, don't change [created] field
@@ -26,7 +26,17 @@ public class DocumentManager {
      */
     public Document save(Document document) {
 
-        return null;
+        if (document.getId() == null || document.getId().isEmpty()) {
+            document.setId(UUID.randomUUID().toString());
+        } else {
+            findById(document.getId()).ifPresent(existingDocument -> {
+                throw new DocumentAlreadyExistsException("Document with ID " + existingDocument.getId() + " already exists");
+            });
+        }
+
+        storage.put(document.getId(), document);
+
+        return document;
     }
 
     /**
@@ -37,7 +47,12 @@ public class DocumentManager {
      */
     public List<Document> search(SearchRequest request) {
 
-        return Collections.emptyList();
+        return storage.values().stream()
+                .filter(document -> matchesTitlePrefixes(document, request.getTitlePrefixes()))
+                .filter(document -> matchesContainsContents(document, request.getContainsContents()))
+                .filter(document -> matchesAuthorIds(document, request.getAuthorIds()))
+                .filter(document -> matchesCreatedRange(document, request.getCreatedFrom(), request.getCreatedTo()))
+                .toList();
     }
 
     /**
@@ -47,8 +62,7 @@ public class DocumentManager {
      * @return optional document
      */
     public Optional<Document> findById(String id) {
-
-        return Optional.empty();
+        return Optional.ofNullable(storage.get(id));
     }
 
     @Data
@@ -77,4 +91,47 @@ public class DocumentManager {
         private String id;
         private String name;
     }
+
+    private boolean matchesTitlePrefixes(Document document, List<String> titlePrefixes) {
+        if (titlePrefixes == null || titlePrefixes.isEmpty()) {
+            return true;
+        }
+
+        return titlePrefixes.stream().anyMatch(prefix -> document.getTitle().startsWith(prefix));
+    }
+
+    private boolean matchesContainsContents(Document document, List<String> containsContents) {
+        if (containsContents == null || containsContents.isEmpty()) {
+            return true;
+        }
+
+        return containsContents.stream().anyMatch(content -> document.getContent().contains(content));
+    }
+
+    private boolean matchesAuthorIds(Document document, List<String> authorIds) {
+        if (authorIds == null || authorIds.isEmpty()) {
+            return true;
+        }
+
+        return authorIds.contains(document.getAuthor().getId());
+    }
+
+    private boolean matchesCreatedRange(Document document, Instant createdFrom, Instant createdTo) {
+        Instant created = document.getCreated();
+        if (createdFrom != null && created.isBefore(createdFrom)) {
+            return false;
+        }
+        if (createdTo != null && created.isAfter(createdTo)) {
+            return false;
+        }
+        return true;
+    }
+}
+
+
+class DocumentAlreadyExistsException extends RuntimeException {
+    public DocumentAlreadyExistsException(String message) {
+        super(message);
+    }
+
 }
